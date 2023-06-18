@@ -9,15 +9,11 @@ ARG PGID=845
 
 # version checksum of the archive to download
 ARG VERSION
-ARG SHA256
-
-# number of retries that curl will use when pulling the headless server tarball
-ARG CURL_RETRIES=8
 
 ENV PORT=34197 \
     RCON_PORT=27015 \
     VERSION=${VERSION} \
-    SHA256=${SHA256} \
+    FACTORIO_APP=/opt/factorio \
     SAVES=/factorio/saves \
     CONFIG=/factorio/config \
     MODS=/factorio/mods \
@@ -25,35 +21,29 @@ ENV PORT=34197 \
     SCRIPTOUTPUT=/factorio/script-output \
     PUID="$PUID" \
     PGID="$PGID"
-
-SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
-RUN set -ox pipefail \
+    
+# SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
+RUN set -x \
     && if [[ "${VERSION}" == "" ]]; then \
         echo "build-arg VERSION is required" \
         && exit 1; \
-    fi \
-    && if [[ "${SHA256}" == "" ]]; then \
-        echo "build-arg SHA256 is required" \
-        && exit 1; \
-    fi \
-    && archive="/tmp/factorio_headless_x64_$VERSION.tar.xz" \
+    fi 
+
+RUN set -x \
     && mkdir -p /opt /factorio \
     && apk add --update --no-cache --no-progress bash binutils curl file gettext jq libintl pwgen shadow su-exec \
-    && curl -sSL "https://www.factorio.com/get-download/$VERSION/headless/linux64" -o "$archive" --retry $CURL_RETRIES\
-    && echo "$SHA256  $archive" | sha256sum -c \
-    || (sha256sum "$archive" && file "$archive" && exit 1) \
-    && tar xf "$archive" --directory /opt \
-    && chmod ugo=rwx /opt/factorio \
-    && rm "$archive" \
-    && ln -s "$SCENARIOS" /opt/factorio/scenarios \
-    && ln -s "$SAVES" /opt/factorio/saves \
-    && mkdir -p /opt/factorio/config/ \
+
+RUN set -x \
+    && chmod ugo=rwx ${FACTORIO_APP} \
+    && ln -s "$SCENARIOS" "${FACTORIO_APP}/scenarios" \
+    && ln -s "$SAVES" "${FACTORIO_APP}/saves" \
+    && mkdir -p "${FACTORIO_APP}/config/" \
     && addgroup -g "$PGID" -S "$GROUP" \
     && adduser -u "$PUID" -G "$GROUP" -s /bin/sh -SDH "$USER" \
-    && chown -R "$USER":"$GROUP" /opt/factorio /factorio
+    && chown -R "$USER":"$GROUP" "${FACTORIO_APP} /factorio"
 
 COPY files/*.sh /
-COPY files/config.ini /opt/factorio/config/config.ini
+COPY files/config.ini "${FACTORIO_APP}/config/config.ini"
 
 VOLUME /factorio
 EXPOSE $PORT/udp $RCON_PORT/tcp

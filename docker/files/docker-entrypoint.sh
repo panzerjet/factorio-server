@@ -2,6 +2,7 @@
 set -eoux pipefail
 
 FACTORIO_VOL=/factorio
+VERSION=${VERSION:latest}
 LOAD_LATEST_SAVE="${LOAD_LATEST_SAVE:-true}"
 GENERATE_NEW_SAVE="${GENERATE_NEW_SAVE:-false}"
 SAVE_NAME="${SAVE_NAME:-""}"
@@ -15,6 +16,26 @@ mkdir -p "$MODS"
 mkdir -p "$SCENARIOS"
 mkdir -p "$SCRIPTOUTPUT"
 
+
+curl -sSL "https://www.factorio.com/download/sha256sums/" -o "sha256sums.txt" --retry 8
+LATEST=`awk '$2==/factorio_headless_x64_.+/ {print $2; exit}' "sha256sums.txt"
+LATEST_SHA=`awk '{print $1}' $LATEST`
+LATEST_VER=`sed "s/factorio_headless_x64_\([0-9]\+\.[0-9]\+\.[0-9]\+\)\.tar\.xz/\1/"`
+rm "sha256sums.txt"
+echo "Latest version available is $LATEST_VER $LATEST_SHA"
+
+
+if [[ -f $FACTORIO_APP/.sha256sum ]]; then
+  # Read checksum of last installation
+  SHA256=`cat .sha256sum`
+fi
+SHA256="${SHA256:-""}"
+
+if [[ "$SHA256" != "$LATEST_SHA" ]] then
+  ./docker-update-game.sh $LATEST_VER
+  echo "$LATEST_SHA" > .sha256sum
+fi
+
 if [[ ! -f $CONFIG/rconpw ]]; then
   # Generate a new RCON password if none exists
   pwgen 15 1 >"$CONFIG/rconpw"
@@ -22,15 +43,15 @@ fi
 
 if [[ ! -f $CONFIG/server-settings.json ]]; then
   # Copy default settings if server-settings.json doesn't exist
-  cp /opt/factorio/data/server-settings.example.json "$CONFIG/server-settings.json"
+  cp "$FACTORIO_APP/data/server-settings.example.json" "$CONFIG/server-settings.json"
 fi
 
 if [[ ! -f $CONFIG/map-gen-settings.json ]]; then
-  cp /opt/factorio/data/map-gen-settings.example.json "$CONFIG/map-gen-settings.json"
+  cp "$FACTORIO_APP/data/map-gen-settings.example.json" "$CONFIG/map-gen-settings.json"
 fi
 
 if [[ ! -f $CONFIG/map-settings.json ]]; then
-  cp /opt/factorio/data/map-settings.example.json "$CONFIG/map-settings.json"
+  cp "$FACTORIO_APP/data/map-settings.example.json" "$CONFIG/map-settings.json"
 fi
 
 NRTMPSAVES=$( find -L "$SAVES" -iname \*.tmp.zip -mindepth 1 | wc -l )
@@ -55,7 +76,7 @@ else
   SU_EXEC=""
 fi
 
-sed -i '/write-data=/c\write-data=\/factorio/' /opt/factorio/config/config.ini
+sed -i '/write-data=/c\write-data=\/factorio/' "$FACTORIO_APP/config/config.ini"
 
 NRSAVES=$(find -L "$SAVES" -iname \*.zip -mindepth 1 | wc -l)
 if [[ $GENERATE_NEW_SAVE != true && $NRSAVES ==  0 ]]; then
@@ -71,7 +92,7 @@ if [[ $GENERATE_NEW_SAVE == true ]]; then
     if [[ -f "$SAVES/$SAVE_NAME.zip" ]]; then
         echo "Map $SAVES/$SAVE_NAME.zip already exists, skipping map generation"
     else
-        $SU_EXEC /opt/factorio/bin/x64/factorio \
+        $SU_EXEC "$FACTORIO_APP/bin/x64/factorio" \
             --create "$SAVES/$SAVE_NAME.zip" \
             --map-gen-settings "$CONFIG/map-gen-settings.json" \
             --map-settings "$CONFIG/map-settings.json"
@@ -105,4 +126,4 @@ else
 fi
 
 # shellcheck disable=SC2086
-exec $SU_EXEC /opt/factorio/bin/x64/factorio "${FLAGS[@]}" "$@"
+exec $SU_EXEC "$FACTORIO_APP/bin/x64/factorio" "${FLAGS[@]}" "$@"

@@ -1,23 +1,16 @@
 version: '2'
 services:
   factorio:
-    build:
-      context: .
-      args:
-      # Check buildinfo.json for supported versions and SHAs
-      # https://github.com/factoriotools/factorio-docker/blob/master/buildinfo.json
-      - VERSION=1.1.61
-      - SHA256=68e4ac8d33b195701c15a23e3d8e65676ef8be25f140657678122f211c60b659
+    container_name: 'factorio-server'
+    hostname: 'factorio-server'
+    image: 'local/factorio-server:latest'
     ports:
      - "34197:34197/udp"
      - "27015:27015/tcp"
     volumes:
-     - /opt/factorio:/factorio
-#    environment:
-#      - PUID=1000
-#      - PGID=1000
-#      - UPDATE_MODS_ON_START=true
-#      - USERNAME=FactorioUsername
-#      - TOKEN=FactorioToken
-#      - PORT=34198
-#      - ADDR=::1
+     - ~/factorio/volume:/factorio
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UPDATE_MODS_ON_START=true
+      
